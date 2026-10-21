@@ -1,0 +1,11 @@
+numpy>=1.26
+pandas>=2.0
+scipy>=1.11
+scikit-learn>=1.4
+xgboost>=2.0
+torch>=2.2
+torch-geometric>=2.5
+networkx>=3.2
+streamlit>=1.40
+plotly>=5.18
+pytest>=8.0
