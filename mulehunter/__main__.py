@@ -71,8 +71,14 @@ def cmd_train(args):
     torch.save(gnn.state_dict(), out / "gnn.pt")
     xgb.save_model(out / "xgb.json")
     table.to_json(out / "metrics.json", indent=2)
-    json.dump([{k: v for k, v in r.__dict__.items() if k != "flows"} for r in rings], open(out / "rings.json", "w"), indent=2, default=int)
-    json.dump({"threshold": thr, "budget": args.budget, "cutoff_day": args.cutoff_day}, open(out / "run.json", "w"))
+    (out / "rings.json").write_text(
+        json.dumps([{k: v for k, v in r.__dict__.items() if k != "flows"} for r in rings], indent=2, default=int),
+        encoding="utf-8",
+    )
+    (out / "run.json").write_text(
+        json.dumps({"threshold": thr, "budget": args.budget, "cutoff_day": args.cutoff_day}),
+        encoding="utf-8",
+    )
     print(f"\nartifacts written to {out}/")
 
 
@@ -94,7 +100,7 @@ def cmd_explain(args):
     out = Path(args.out)
     scores = pd.read_csv(out / "scores.csv").set_index("account")
     feats = pd.read_csv(out / "features.csv").set_index("account")
-    run = json.load(open(out / "run.json"))
+    run = json.loads((out / "run.json").read_text(encoding="utf-8"))
     accounts, txns = load(args)
     flagged = set(scores.index[scores["score"] >= run["threshold"]])
     s = scores.loc[args.account]
@@ -107,7 +113,7 @@ def cmd_explain(args):
 
         ds = build(accounts, txns, args.seed, run["cutoff_day"] * DAY if run["cutoff_day"] else None)
         m = DirSAGE(ds.x.shape[1])
-        m.load_state_dict(torch.load(out / "gnn.pt"))
+        m.load_state_dict(torch.load(out / "gnn.pt", weights_only=True))
         print("\nmodel attribution (gradient x input):")
         print(feature_saliency(m, ds, args.account).head(6).round(3).to_string())
 
