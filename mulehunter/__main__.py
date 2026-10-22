@@ -5,6 +5,7 @@
     python -m mulehunter train --ibm HI-Small_Trans.csv --out artifacts
     python -m mulehunter timeline --data data
     python -m mulehunter explain 1234 --out artifacts
+    python -m mulehunter elliptic --data elliptic/     # real Bitcoin flows (Elliptic dataset)
 """
 from __future__ import annotations
 
@@ -141,9 +142,21 @@ def main(argv=None):
         if name == "explain":
             p.add_argument("account", type=int)
             p.add_argument("--saliency", action="store_true")
+    e = sub.add_parser("elliptic", help="score the models on the real Elliptic Bitcoin dataset")
+    e.add_argument("--data", required=True, help="folder with elliptic_txs_{features,edgelist,classes}.csv")
+    e.add_argument("--out", default="results/elliptic.json")
     args = ap.parse_args(argv)
 
-    if args.cmd == "simulate":
+    if args.cmd == "elliptic":
+        import json
+
+        from .elliptic import run
+
+        res = run(args.data, seed=args.seed)
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(json.dumps(res, indent=2))
+        print(json.dumps(res, indent=2))
+    elif args.cmd == "simulate":
         a, t = simulate(SimConfig(n_retail=args.accounts, n_rings=args.rings, days=args.days, seed=args.seed))
         Path(args.out).mkdir(parents=True, exist_ok=True)
         a.to_csv(Path(args.out) / "accounts.csv.gz", index=False)

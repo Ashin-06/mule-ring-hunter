@@ -89,6 +89,25 @@ An alert-budget slider recomputes the flags and rings live.
 
 ## Real data
 
+### Measured on real illicit flows (Elliptic)
+
+No public bank releases labelled mule accounts, so the closest real test is the [Elliptic Bitcoin dataset](https://pytorch-geometric.readthedocs.io/en/2.7.0/generated/torch_geometric.datasets.EllipticBitcoinDataset.html). It has 203,769 real transactions, 234,355 directed payment flows, and 4,545 transactions labelled illicit. Nodes there are transactions, not accounts, so the account features above don't apply. The same directed GraphSAGE, XGBoost and rank ensemble run on Elliptic's own 165 features, with the paper's time split: train on steps 1–34, test on 35–49 (`python -m mulehunter elliptic --data elliptic/`, results in `results/elliptic.json`).
+
+| Model (test steps 35–49, 1,083 illicit) | PR-AUC | Illicit F1 |
+|---|---|---|
+| Features + XGBoost, paper protocol (steps 1–34, threshold 0.5) | **0.80** | **0.75** |
+| Features + XGBoost (steps 30–34 held out to pick the threshold) | 0.79 | 0.72 |
+| Directed GraphSAGE | 0.50–0.55 | 0.48–0.52 (varies by GPU run) |
+| Ensemble | 0.75 | 0.73 |
+| *Published (Weber et al. 2019): random forest / GCN* | | *0.79 / 0.63* |
+
+What this says:
+- **The feature model is close to the published random forest.** The graph model trails it, as the published GCN does.
+- **Every model collapses after step 43** (F1 ≈ 0.02). A dark market closed there and illicit behaviour changed; the paper reports the same. That is the case for retraining on a rolling window and watching for drift, not trusting a model trained once.
+- **The simulator's much higher numbers measure the method on generated rings, not real-world accuracy.**
+
+### Your own data
+
 ```bash
 # IBM AMLworld (Altman et al., NeurIPS 2023) - accounts touching a laundering transaction are positives
 python -m mulehunter train --ibm HI-Small_Trans.csv
@@ -111,6 +130,7 @@ mulehunter/
   features.py   behavioural features from the raw ledger
   model.py      directed GraphSAGE, XGBoost, ensemble, ring-aware split, metrics
   explain.py    reasons, ring reconstruction (flows + devices + shared victims, Louvain)
+  elliptic.py   the same models on the real Elliptic Bitcoin dataset
   __main__.py   CLI
 app.py          Streamlit investigation dashboard
 ```

@@ -1,0 +1,41 @@
+{
+  "dataset": "Elliptic Bitcoin (real transactions)",
+  "nodes": 203769,
+  "edges": 234355,
+  "labelled_illicit": 4545,
+  "test_illicit": 1083,
+  "test_licit": 15587,
+  "published_illicit_f1": {
+    "random forest, all features (Weber et al.)": 0.788,
+    "GCN (Weber et al.)": 0.628
+  },
+  "models": {
+    "features + XGBoost": {
+      "pr_auc": 0.7907,
+      "roc_auc": 0.9298,
+      "illicit_f1_val_threshold": 0.7247,
+      "illicit_f1_at_0.5": 0.7029,
+      "illicit_f1_steps_35_42": 0.8525,
+      "illicit_f1_steps_43_49": 0.0179
+    },
+    "directed GraphSAGE": {
+      "pr_auc": 0.5513,
+      "roc_auc": 0.8823,
+      "illicit_f1_val_threshold": 0.5233,
+      "illicit_f1_at_0.5": 0.4885,
+      "illicit_f1_steps_35_42": 0.6124,
+      "illicit_f1_steps_43_49": 0.0273
+    },
+    "ensemble": {
+      "pr_auc": 0.7533,
+      "roc_auc": 0.9292,
+      "illicit_f1_val_threshold": 0.734,
+      "illicit_f1_steps_35_42": 0.8278,
+      "illicit_f1_steps_43_49": 0.0278
+    },
+    "features + XGBoost, paper protocol": {
+      "pr_auc": 0.8007,
+      "illicit_f1_at_0.5": 0.7498
+    }
+  }
+}
