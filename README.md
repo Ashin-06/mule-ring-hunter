@@ -1,142 +1,75 @@
 # Mule Ring Hunter
 
-Finds money-mule *networks* in instant-payment data (UPI / IMPS style), not just single suspicious accounts. For each ring it rebuilds the laundering chain end to end: victims → entry mules → layering → cash-out.
+Finds money-mule networks in instant-payment data (UPI and IMPS style), not just single suspicious accounts. For each ring it traces the laundering chain from victims through entry mules and layering accounts to cash-out.
 
-Scam proceeds are laundered through chains of accounts that each look only mildly odd. Transaction-level fraud rules miss them because no single payment is unusual. The signal is in the shape: many unrelated people paying a new account that forwards nearly everything within minutes to accounts that drain it at ATMs.
+Scam money is moved through chains of accounts that each look only slightly unusual, so rules that judge one payment at a time miss them. The pattern shows in the network: many unrelated people paying a new account that forwards almost everything within minutes to accounts that empty it at ATMs.
 
-## What it does
+## Features
 
-1. **Behavioural features per account.** Pass-through ratio, median holding time, share of money forwarded within an hour, one-off senders, structuring just below ₹50,000, cash/crypto exit share, device sharing, burstiness, account age.
-2. **Directed GraphSAGE.** Each layer aggregates *senders* and *receivers* separately, so the model learns that a mule is paid by victims and pays other mules. A residual path keeps each account's own behaviour visible.
-3. **XGBoost baseline and rank ensemble.** A gradient-boosted model on the same features, averaged with the GNN by rank, so calibration differences don't matter.
-4. **Ring reconstruction.** Flagged accounts are linked by money flows, shared devices and shared victims. Louvain communities split hubs that would otherwise merge separate rings. For each ring the tool reports victims, money in, cash out, active window and each member's inferred role.
-5. **Plain-language reasons**, for example: *"money out equals 97% of money in; payments leave a median 14 min after funds arrive · 23 different senders, 91% of whom paid only once · device shared with 3 other accounts"*.
-6. **Early detection.** `timeline` retrains as of day N using only transactions up to that day, which shows how soon a ring becomes catchable.
+- Behavioural features for every account: pass-through ratio, how long money stays, share forwarded within an hour, one-off senders, amounts just under ₹50,000, cash and crypto exits, shared devices and account age.
+- A directed GraphSAGE model that looks at who pays an account and whom it pays separately.
+- An XGBoost model on the same features, combined with the graph model by rank.
+- Ring reconstruction: flagged accounts are linked by money flows, shared devices and shared victims, then split into rings with Louvain community detection. Each ring gets victims, money in, cash out, active dates and a role for every member.
+- Plain-language reasons for every flag, for example: "money out equals 97% of money in; payments leave a median 14 min after funds arrive; 23 different senders, 91% of whom paid only once".
+- An early-detection view that retrains on the first N days of data to show how soon a ring can be caught.
+- A Streamlit dashboard for investigators.
 
-## The data is the hard part
-
-The simulator (`mulehunter/simulate.py`) builds a 6,000-customer payment network that includes the cases that cause false positives:
-
-| Legitimate pattern | Why it looks like a mule |
-|---|---|
-| Merchants settling nightly | Fan-in from hundreds of customers, ~97% passed on |
-| Group collectors (trip money, chit funds) | 10–20 friends chip in, the total is forwarded within an hour |
-| Small traders / resellers | Many one-off buyers, supplier paid the same day |
-| Landlords | Several fixed inflows, a large transfer out |
-| Shared household phones | Device sharing |
-
-The mule rings vary in the ways real rings do:
-- **Rented accounts.** Half of the entry mules are real customers with years of salary and shopping history.
-- **"Careful" rings** (40%) hold funds for hours, keep a 10–25% cut and don't share phones.
-- Transfers are structured below reporting limits, and cash-out is split across ATM withdrawals or crypto exchanges.
-
-Train/validation/test splits are **ring-aware**: every test ring is entirely unseen during training.
-
-## Results
-
-`python -m mulehunter train` (seed 7, 2% alert budget):
-
-```
-held-out rings (never seen in training):
-                    pr_auc  roc_auc  recall@top1%  precision@top1%
-features + XGBoost   0.977    0.999         0.536              1.0
-directed GraphSAGE   0.995    1.000         0.536              1.0
-ensemble             0.989    1.000         0.536              1.0
-
-recall by mule type (test split):
-         group   value  mules  recall
-          role cashout      5    1.00
-          role   tier1     14    0.93
-          role   tier2      9    1.00
-rented account   fresh     21    1.00
-rented account  rented      7    0.86
-```
-
-Recall@top1% tops out at 0.54 here only because the test split has more mules than 1% of its accounts.
-
-Early detection (`python -m mulehunter timeline`), PR-AUC on unseen rings using only the first N days:
-
-| Day | Active test mules | XGBoost | GraphSAGE | Ensemble |
-|---|---|---|---|---|
-| 10 | 8 | 0.84 | 0.25 | 0.62 |
-| 15 | 8 | 0.96 | 0.92 | 0.98 |
-| 20 | 14 | 0.85 | 0.84 | 0.81 |
-| 30 | 20 | 0.99 | 1.00 | 1.00 |
-| 45 | 28 | 0.98 | 0.99 | 0.99 |
-
-Ring reconstruction at a 2% budget recovers 13 of 16 true rings with Jaccard ≥ 0.5 (mean Jaccard 0.76).
-
-These are synthetic numbers and the simulator is generous. Expect much lower scores on real data; use the loaders below to measure that. Rented accounts are where the model is weakest, and they are also where banks struggle most.
-
-## Run it
+## Quick start
 
 ```bash
 pip install -r requirements.txt
-python -m mulehunter simulate                 # data/accounts.csv.gz, data/txns.csv.gz
-python -m mulehunter train                    # metrics, rings, artifacts/
+python -m pytest -q
+python -m mulehunter simulate                 # writes data/accounts.csv.gz and data/txns.csv.gz
+python -m mulehunter train                    # trains the models, prints metrics and rings
 python -m mulehunter timeline                 # early-detection curve
-python -m mulehunter explain 6339 --saliency  # why was this account flagged
-streamlit run app.py                          # investigation dashboard
-python -m pytest -q                           # 6 tests
+python -m mulehunter explain 6339 --saliency  # why one account was flagged
+streamlit run app.py                          # dashboard
 ```
 
-The dashboard has three views:
-- **Model:** metrics, early-detection curve, score histogram.
-- **Rings:** ring table, money-flow graph with inferred roles, Sankey of where the money went, per-member reasons.
-- **Account lookup:** account history.
+The dashboard has three views: model metrics, the rings (with a money-flow graph and where the money went), and an account lookup. An alert-budget slider recomputes the flags and rings.
 
-An alert-budget slider recomputes the flags and rings live.
+## Results
 
-## Real data
+| Test | Result |
+|---|---|
+| Simulated network, rings never seen in training | PR-AUC 0.98–0.995; 13 of 16 rings rebuilt |
+| Real Bitcoin flows (Elliptic, time split as in the paper) | illicit F1 0.75, close to the published random forest (0.79) |
+| Elliptic after a dark market closed (step 43 on) | every model drops to F1 about 0.02 |
 
-### Measured on real illicit flows (Elliptic)
+The simulated numbers measure the method on generated rings, not real-world accuracy. Details are in [docs/evaluation.md](docs/evaluation.md).
 
-No public bank releases labelled mule accounts, so the closest real test is the [Elliptic Bitcoin dataset](https://pytorch-geometric.readthedocs.io/en/2.7.0/generated/torch_geometric.datasets.EllipticBitcoinDataset.html). It has 203,769 real transactions, 234,355 directed payment flows, and 4,545 transactions labelled illicit. Nodes there are transactions, not accounts, so the account features above don't apply. The same directed GraphSAGE, XGBoost and rank ensemble run on Elliptic's own 165 features, with the paper's time split: train on steps 1–34, test on 35–49 (`python -m mulehunter elliptic --data elliptic/`, results in `results/elliptic.json`).
+## Using your own data
 
-| Model (test steps 35–49, 1,083 illicit) | PR-AUC | Illicit F1 |
-|---|---|---|
-| Features + XGBoost, paper protocol (steps 1–34, threshold 0.5) | **0.80** | **0.75** |
-| Features + XGBoost (steps 30–34 held out to pick the threshold) | 0.79 | 0.72 |
-| Directed GraphSAGE | 0.50–0.55 | 0.48–0.52 (varies by GPU run) |
-| Ensemble | 0.75 | 0.73 |
-| *Published (Weber et al. 2019): random forest / GCN* | | *0.79 / 0.63* |
-
-What this says:
-- **The feature model is close to the published random forest.** The graph model trails it, as the published GCN does.
-- **Every model collapses after step 43** (F1 ≈ 0.02). A dark market closed there and illicit behaviour changed; the paper reports the same. That is the case for retraining on a rolling window and watching for drift, not trusting a model trained once.
-- **The simulator's much higher numbers measure the method on generated rings, not real-world accuracy.**
-
-### Your own data
+Two public datasets can be loaded directly:
 
 ```bash
-# IBM AMLworld (Altman et al., NeurIPS 2023) - accounts touching a laundering transaction are positives
-python -m mulehunter train --ibm HI-Small_Trans.csv
-
-# PaySim - destinations of fraudulent TRANSFERs are positives
-python -m mulehunter train --paysim PS_20174392719_1491204439457_log.csv
+python -m mulehunter train --ibm HI-Small_Trans.csv          # IBM AMLworld
+python -m mulehunter train --paysim PS_2017_log.csv          # PaySim
+python -m mulehunter elliptic --data elliptic/               # Elliptic Bitcoin
 ```
 
-For your own data, write two tables:
+For your own data, write two tables to `data/` as `.csv.gz`:
+
 - `accounts`: `account, kind, created_ts, device, is_mule, ring_id`
 - `txns`: `txn_id, ts, src, dst, amount, channel`
 
-Put them in `data/` as `.csv.gz`. Device ids and account opening dates add a lot of signal if you have them.
+Device IDs and account opening dates add a lot of signal if you have them.
 
-## Layout
+## Project layout
 
 ```
 mulehunter/
-  simulate.py   payment network + mule rings + loaders for IBM AML / PaySim
-  features.py   behavioural features from the raw ledger
-  model.py      directed GraphSAGE, XGBoost, ensemble, ring-aware split, metrics
-  explain.py    reasons, ring reconstruction (flows + devices + shared victims, Louvain)
-  elliptic.py   the same models on the real Elliptic Bitcoin dataset
-  __main__.py   CLI
-app.py          Streamlit investigation dashboard
+  simulate.py   simulated payment network and loaders for IBM AML and PaySim
+  features.py   behavioural features from the transactions
+  model.py      GraphSAGE, XGBoost, ensemble, ring-aware splits, metrics
+  explain.py    reasons and ring reconstruction
+  elliptic.py   the same models on the Elliptic dataset
+app.py          Streamlit dashboard
 ```
 
-## Notes
+## Limitations
 
-- The model is transductive: it scores the graph it was trained on. For daily scoring, retrain on a rolling window, or keep the weights and call `predict` on the new graph. GraphSAGE generalises to unseen nodes.
-- Mule labels in real banks are noisy and late. Accounts confirmed through chargebacks or police requests are positives. Treat unconfirmed accounts as unlabeled, not negative.
-- Reasons are computed from features, not the model. They stay readable and auditable even when the model changes.
+- The model scores the graph it was trained on. For daily scoring, retrain on a rolling window or call `predict` on the new graph.
+- Real mule labels are noisy and late. Treat accounts confirmed through chargebacks or police requests as positives and the rest as unlabelled, not as negatives.
+- Reasons come from the features, not the model, so they stay readable when the model changes.
+- There is no API service yet; it runs as a CLI and a dashboard.
