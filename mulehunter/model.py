@@ -67,7 +67,8 @@ def build(accounts: pd.DataFrame, txns: pd.DataFrame, seed: int = 0, cutoff_ts: 
     edge_index = torch.as_tensor(pairs, dtype=torch.long)
     eligible = accounts["kind"].isin(SCORED_KINDS).to_numpy()
     if cutoff_ts is not None and "ring_start" in accounts:
-        eligible &= ~((accounts["is_mule"] == 1) & (accounts["ring_start"] >= cutoff_ts)).to_numpy()
+        # not &=: pandas 3 hands out read-only arrays
+        eligible = eligible & ~((accounts["is_mule"] == 1) & (accounts["ring_start"] >= cutoff_ts)).to_numpy()
     split = ring_split(accounts, eligible, seed)
     split[~eligible] = ""
     return Dataset(accounts, txns, feats, torch.as_tensor(model_matrix(feats)), edge_index,
