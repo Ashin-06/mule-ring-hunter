@@ -6,11 +6,15 @@
     python -m mulehunter timeline --data data
     python -m mulehunter explain 1234 --out artifacts
     python -m mulehunter elliptic --data elliptic/     # real Bitcoin flows (Elliptic dataset)
+    python -m mulehunter serve                         # analysis API (settings: MULEHUNTER_* environment variables)
+    python -m mulehunter migrate                       # apply database migrations and exit
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -145,7 +149,33 @@ def main(argv=None):
     e = sub.add_parser("elliptic", help="score the models on the real Elliptic Bitcoin dataset")
     e.add_argument("--data", required=True, help="folder with elliptic_txs_{features,edgelist,classes}.csv")
     e.add_argument("--out", default="results/elliptic.json")
+    sv = sub.add_parser("serve", help="analysis API")
+    sv.add_argument("--host", help="default MULEHUNTER_HOST or 127.0.0.1; any other address needs API keys")
+    sv.add_argument("--port", type=int, help="default MULEHUNTER_PORT or 8002")
+    sub.add_parser("migrate", help="apply database migrations to MULEHUNTER_DATABASE_URL")
     args = ap.parse_args(argv)
+
+    if args.cmd in ("serve", "migrate"):
+        from . import db, ops
+
+        for name, val in (("HOST", getattr(args, "host", None)), ("PORT", getattr(args, "port", None))):
+            if val is not None:
+                os.environ[f"MULEHUNTER_{name}"] = str(val)
+        try:
+            settings = ops.load_settings()  # fail here, before uvicorn, with a readable message
+        except ops.ConfigError as e:
+            sys.exit(f"configuration error: {e}")
+        if args.cmd == "migrate":
+            print(*(db.migrate(db.engine(settings.database_url)) or ["up to date"]), sep="\n")
+            return
+        import uvicorn
+
+        ops.setup_logging(settings.log_level)
+        try:
+            uvicorn.run("mulehunter.api:app", host=settings.host, port=settings.port, log_config=None, access_log=False)
+        except ops.ConfigError as e:  # raised while importing the app: no model directory or unreadable models
+            sys.exit(f"configuration error: {e}")
+        return
 
     if args.cmd == "elliptic":
         import json
