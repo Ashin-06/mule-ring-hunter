@@ -32,11 +32,30 @@ The dashboard has three views: model metrics, the rings (with a money-flow graph
 
 | Test | Result |
 |---|---|
-| Simulated network, rings never seen in training | PR-AUC 0.98–0.995; 13 of 16 rings rebuilt |
+| Simulated network, rings never seen in training | PR-AUC 0.976–0.998; 15 of 16 rings rebuilt |
 | Real Bitcoin flows (Elliptic, time split as in the paper) | illicit F1 0.75, close to the published random forest (0.79) |
 | Elliptic after a dark market closed (step 43 on) | every model drops to F1 about 0.02 |
 
 The simulated numbers measure the method on generated rings, not real-world accuracy. Details are in [docs/evaluation.md](docs/evaluation.md).
+
+## Analysis API
+
+`python -m mulehunter serve` (or the container image, `docker build -t mule-ring-hunter .`, see [docs/runbook.md](docs/runbook.md)) analyses a batch of accounts and transactions with the trained models.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /v1/analyse` | up to 20,000 accounts and 50,000 transactions; returns scored and flagged accounts within an alert budget, and ring candidates |
+| `GET /v1/analyses`, `/v1/analyses/{id}` | past analyses and their findings (the transactions are not stored) |
+| `GET /healthz`, `/readyz`, `/metrics` | health, readiness and Prometheus metrics |
+
+Models load from `gnn.pt` (with `weights_only=True`) and `xgb.json`, neither of which runs code. Features are standardised within each batch, so send a meaningful slice of the payment graph. API keys carry a role: `analyst`, `viewer`, `monitor`. Create one with `python -m mulehunter.ops keygen`.
+
+| Variable | Purpose |
+|---|---|
+| `MULEHUNTER_ENV=production` | refuse to start without hashed API keys, a database and a model directory |
+| `MULEHUNTER_MODEL_DIR` | `gnn.pt` and `xgb.json` from `train` |
+| `MULEHUNTER_API_KEYS` / `MULEHUNTER_KEYS_FILE` | hashed API keys with roles |
+| `MULEHUNTER_DATABASE_URL` | the analysis log: `sqlite:///...` or `postgresql://...` |
 
 ## Using your own data
 
@@ -72,4 +91,10 @@ app.py          Streamlit dashboard
 - The model scores the graph it was trained on. For daily scoring, retrain on a rolling window or call `predict` on the new graph.
 - Real mule labels are noisy and late. Treat accounts confirmed through chargebacks or police requests as positives and the rest as unlabelled, not as negatives.
 - Reasons come from the features, not the model, so they stay readable when the model changes.
-- There is no API service yet; it runs as a CLI and a dashboard.
+- The code has not had an independent security review.
+
+See [SECURITY.md](SECURITY.md), [docs/threat-model.md](docs/threat-model.md) and [docs/model-card.md](docs/model-card.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

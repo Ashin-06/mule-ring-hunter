@@ -16,13 +16,13 @@ The mule rings vary in realistic ways. Half of the entry mules are rented accoun
 
 Train, validation and test splits are made by ring, so every test ring is unseen during training.
 
-`python -m mulehunter train` (seed 7, 2% alert budget), on held-out rings:
+`python -m mulehunter train` (seed 7, 2% alert budget), on held-out rings. These numbers are from a re-run on the pinned dependencies (torch 2.15, PyG 2.8, xgboost 3.4); the first run gave PR-AUC 0.977 / 0.995 / 0.989 and rebuilt 13 of 16 rings. The early-detection table below and the Elliptic results were not re-run.
 
 | Model | PR-AUC | ROC-AUC | Recall in top 1% | Precision in top 1% |
 |---|---|---|---|---|
-| Features + XGBoost | 0.977 | 0.999 | 0.536 | 1.0 |
-| Directed GraphSAGE | 0.995 | 1.000 | 0.536 | 1.0 |
-| Ensemble | 0.989 | 1.000 | 0.536 | 1.0 |
+| Features + XGBoost | 0.976 | 0.999 | 0.536 | 1.0 |
+| Directed GraphSAGE | 0.998 | 1.000 | 0.536 | 1.0 |
+| Ensemble | 0.988 | 1.000 | 0.536 | 1.0 |
 
 Recall in the top 1% is capped at 0.54 because the test split has more mules than 1% of its accounts.
 
@@ -38,7 +38,7 @@ Early detection (`python -m mulehunter timeline`), PR-AUC on unseen rings using 
 | 30 | 20 | 0.99 | 1.00 | 1.00 |
 | 45 | 28 | 0.98 | 0.99 | 0.99 |
 
-Ring reconstruction at a 2% budget recovers 13 of 16 true rings with Jaccard ≥ 0.5 (mean 0.76).
+Ring reconstruction at a 2% budget recovers 15 of 16 true rings with Jaccard ≥ 0.5 (mean 0.79).
 
 The simulator is generous, so expect much lower scores on real data. Rented accounts are the weakest case, as they are for banks.
 
