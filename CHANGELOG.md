@@ -2,6 +2,12 @@
 
 All notable changes to this project. Versions follow [semantic versioning](https://semver.org/).
 
+## 1.0.1 — 2026-11-03
+
+### Fixed
+- The container image no longer prints PyG and torch `FutureWarning`s as plain text at start-up
+  (`PYTHONWARNINGS=ignore::FutureWarning`), so every log line is JSON.
+
 ## 1.0.0 — 2026-11-02
 
 ### Added

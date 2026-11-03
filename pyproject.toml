@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mule-ring-hunter"
-version = "1.0.0"
+version = "1.0.1"
 description = "Money-mule ring detection with a directed GraphSAGE and XGBoost ensemble, and an analysis API"
 readme = "README.md"
 requires-python = ">=3.12"

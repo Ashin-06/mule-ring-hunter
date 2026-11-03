@@ -5,6 +5,8 @@ COPY requirements.lock /tmp/
 RUN python -m venv /opt/venv && /opt/venv/bin/pip install -r /tmp/requirements.lock
 
 FROM python:3.12-slim-bookworm
+# PyG and torch print FutureWarnings at import, before JSON logging starts; they are for developers
+ENV PYTHONWARNINGS=ignore::FutureWarning
 ENV PATH=/opt/venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     MULEHUNTER_ENV=production MULEHUNTER_HOST=0.0.0.0 MULEHUNTER_PORT=8002 \
     MULEHUNTER_DATABASE_URL=sqlite:////data/mulehunter.db MULEHUNTER_MODEL_DIR=/models
