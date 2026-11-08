@@ -17,7 +17,7 @@ Scam money is moved through chains of accounts that each look only slightly unus
 ## Quick start
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt   # on macOS, first: brew install libomp
 python -m pytest -q
 python -m mulehunter simulate                 # writes data/accounts.csv.gz and data/txns.csv.gz
 python -m mulehunter train                    # trains the models, prints metrics and rings

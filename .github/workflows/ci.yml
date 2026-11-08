@@ -27,6 +27,8 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements-dev.lock
+      - if: runner.os == 'macOS'
+        run: brew install libomp   # OpenMP runtime for XGBoost and LightGBM
       - run: pip install -r requirements-dev.lock
       - run: ruff check .
       - run: bandit -q -r mulehunter -ll
