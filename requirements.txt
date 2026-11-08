@@ -2,7 +2,8 @@ numpy>=1.26
 pandas>=2.0
 scipy>=1.11
 scikit-learn>=1.4
-xgboost-cpu>=2.1     # same xgboost module, without the CUDA libraries
+xgboost-cpu>=2.1 ; sys_platform != "darwin"   # same xgboost module, without the CUDA libraries
+xgboost>=2.1 ; sys_platform == "darwin"       # xgboost-cpu has no macOS build
 torch>=2.2
 torch-geometric>=2.5
 networkx>=3.2
